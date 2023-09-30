@@ -203,11 +203,6 @@ def tick_command(args):
     state["frame"] += 1
     write_state(state)
 
-def start_frame_command(args):
-    state = read_state()
-    state["tick_start_time"] = datetime.now()
-    write_state(state)
-
 def main():
     parser = argparse.ArgumentParser(description="Run foldy bird")
 
@@ -225,9 +220,6 @@ def main():
 
     sleep_parser = subparsers.add_parser("sleep", help="Sleep between ticks")
     sleep_parser.set_defaults(func=sleep_command)
-
-    start_frame = subparsers.add_parser("start-frame", help="Initialize the frame")
-    start_frame.set_defaults(func=start_frame_command)
 
     args = parser.parse_args()
     if hasattr(args, "func"):

@@ -29,6 +29,7 @@ WING2  = "📁"
 BROWN =  "🟫"
 YELLOW = "🟨"
 ORANGE = "🟧"
+RED    = "💥"
 EYES   = "👀"
 #EYES   = "👁️"
 
@@ -100,16 +101,16 @@ def add_pipes_to_grid(grid, frame):
                 color = BROWN if second_to_last else GREEN
                 grid[pipe_y][pipe_x] = color
 
-def add_player_to_grid(grid, state):
-    player_y = state["player_y"]
-    fall_speed = state["fall_speed"]
-
+def add_player_to_grid(grid, state, collisions):
     # I tried putting eyes in the bottom right to emphasize that we're falling
     # it feels like we should be able to do this but it ends up looking weird,
     # I think it's because the orientation of the eyes emoji doesn't change?
     for (x, y, c) in all_player_coords(state):
-        if y < HEIGHT - 1:
-            grid[y][x] = c
+        if y < HEIGHT:
+            if (x, y) in collisions and c != EYES:
+                grid[y][x] = RED
+            else:
+                grid[y][x] = c
 
 def draw_grid(state, grid):
     write_to_buf1 = state["write_to_buf1"]
@@ -131,20 +132,25 @@ def draw_grid(state, grid):
     print(target_dir.split("/")[-1])
     state["write_to_buf1"] = not write_to_buf1
 
-#def check_for_collision(state):
-    #player_y = state["player_y"]
-    #player_coords = []
-    #for dy in (0, 1):
-        #for dx in (0, -1):
-            #y = player_y + dy
-            #x = PLAYER_x + dx
-            #player_coords.append((x, y))
+def check_for_collision(state):
+    player_coords = set((x, y) for (x, y, _c) in all_player_coords(state))
+
+    frame = state["frame"]
+    collisions = set()
+    for (is_top, locations) in ((True, TOP), (False, BOTTOM)):
+        for (x, height) in locations:
+            for (pipe_x, pipe_y) in all_pipe_locations(x, frame, height, is_top):
+                # This is gross but it's annoying to do the conversion elsewhere
+                if pipe_y < 0: pipe_y += HEIGHT
+                if (pipe_x, pipe_y) in player_coords:
+                    collisions.add((pipe_x, pipe_y))
+    return collisions
 
 def create_and_draw_grid(state):
     grid = [[BLUE for _ in range(WIDTH)] for _ in range(HEIGHT)]
+    collisions = check_for_collision(state)
     add_pipes_to_grid(grid, state["frame"])
-    add_player_to_grid(grid, state)
-    #check_for_collision()
+    add_player_to_grid(grid, state, collisions)
     draw_grid(state, grid)
 
 def get_last_opened(state):
@@ -160,6 +166,10 @@ def await_command(args):
         if last_opened != current_last_opened: break
         time.sleep(0.25)
 
+def append_to_log(message):
+    with open("log", "a") as f:
+        f.write(f"{message}\n")
+
 def sleep_command(args):
     state = read_state()
     start_of_frame = state["tick_start_time"]
@@ -169,8 +179,7 @@ def sleep_command(args):
         time_spent_on_frame = (now - start_of_frame).total_seconds()
         diff = TARGET_FRAMETIME - time_spent_on_frame
 
-        with open("log", "a") as f:
-            f.write(f"FRAMETIME: {time_spent_on_frame}\n")
+        append_to_log(f"FRAMETIME: {time_spent_on_frame}")
 
         if diff > 0:
             time.sleep(diff)
@@ -210,6 +219,8 @@ def initialize_command(args):
     state = get_initial_state()
     initialize_buffers()
     create_and_draw_grid(state)
+    if os.path.exists("log"):
+        os.remove("log")
     write_state(state)
 
 def first_time_setup_command(args):

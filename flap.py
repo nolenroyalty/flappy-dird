@@ -16,6 +16,7 @@ PIPE_WIDTH = 3
 PLAYER_X = 3
 TARGET_FPS = 4
 TARGET_FRAMETIME = 1.0 / TARGET_FPS
+MAX_FRAME = 40
 
 BUFFER_1 = "./buf1"
 BUFFER_2 = "./buf2"
@@ -29,9 +30,9 @@ WING2  = "📁"
 BROWN =  "🟫"
 YELLOW = "🟨"
 ORANGE = "🟧"
-RED    = "💥"
+X      = "❌"
+RED    = "🟥"
 EYES   = "👀"
-#EYES   = "👁️"
 
 BOTTOM = [(10, 4), (24, 4), (38, 6)]
 TOP = [(16, 4), (24, 4), (30, 6)]
@@ -53,7 +54,8 @@ def get_initial_state():
              "player_y": 5,
              "fall_speed": 0,
              "tick_start_time": None,
-             "flapped_on_prior_frame": False
+             "flapped_on_prior_frame": False,
+             "state": "waiting"
              }
     return state
 
@@ -102,12 +104,15 @@ def add_pipes_to_grid(grid, frame):
                 grid[pipe_y][pipe_x] = color
 
 def add_player_to_grid(grid, state, collisions):
+    dead = state["state"] == "dying"
     # I tried putting eyes in the bottom right to emphasize that we're falling
     # it feels like we should be able to do this but it ends up looking weird,
     # I think it's because the orientation of the eyes emoji doesn't change?
     for (x, y, c) in all_player_coords(state):
         if y < HEIGHT:
-            if (x, y) in collisions and c != EYES:
+            if (x, y) in collisions:
+                grid[y][x] = X
+            elif dead and c != EYES:
                 grid[y][x] = RED
             else:
                 grid[y][x] = c
@@ -146,9 +151,8 @@ def check_for_collision(state):
                     collisions.add((pipe_x, pipe_y))
     return collisions
 
-def create_and_draw_grid(state):
+def create_and_draw_grid(state, collisions):
     grid = [[BLUE for _ in range(WIDTH)] for _ in range(HEIGHT)]
-    collisions = check_for_collision(state)
     add_pipes_to_grid(grid, state["frame"])
     add_player_to_grid(grid, state, collisions)
     draw_grid(state, grid)
@@ -187,14 +191,17 @@ def sleep_command(args):
     state["tick_start_time"] = datetime.now()
     write_state(state)
 
-    if state["frame"] < 40:
-        print("continue")
-    else:
-        print("exit")
+    if state["state"] == "dying":
+        append_to_log(f"{state['player_y']}")
+    match state["frame"], state["state"], state["player_y"]:
+        case frame, _, _ if frame >= MAX_FRAME:
+            print("exit")
+        case _, "dying", y if y >= HEIGHT - 1:
+            print("exit")
+        case _:
+            print("continue")
 
-def tick_command(args):
-    state = read_state()
-    count = args.selection_count
+def handle_tick_running(state, count):
     flapped = count > 0
     fall_speed = state["fall_speed"]
     player_y = state["player_y"]
@@ -211,14 +218,35 @@ def tick_command(args):
     state["fall_speed"] = fall_speed
     state["player_y"] = player_y
 
-    create_and_draw_grid(state)
+    collisions = check_for_collision(state)
+    create_and_draw_grid(state, collisions)
+    if collisions:
+        state["state"] = "dying"
     state["frame"] += 1
     write_state(state)
+
+def handle_tick_dying(state):
+    player_y = state["player_y"] 
+    player_y = min(player_y + 2, HEIGHT - 1)
+    create_and_draw_grid(state, set())
+    state["player_y"] = player_y
+    write_state(state)
+
+def tick_command(args):
+    state = read_state()
+    match state["state"]:
+        case "waiting":
+            state["state"] = "ticking"
+            handle_tick_running(state, args.selection_count)
+        case "ticking":
+            handle_tick_running(state, args.selection_count)
+        case "dying":
+            handle_tick_dying(state)
 
 def initialize_command(args):
     state = get_initial_state()
     initialize_buffers()
-    create_and_draw_grid(state)
+    create_and_draw_grid(state, set())
     if os.path.exists("log"):
         os.remove("log")
     write_state(state)

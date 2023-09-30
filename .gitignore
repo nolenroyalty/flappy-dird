@@ -1,3 +1,13 @@
+*.swp
+
+# game directorys
+buf1/
+buf2/
+state.json
+log
+# flappy-dird.applescript is the version with template variables replaced
+flappy-dird.applescript
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

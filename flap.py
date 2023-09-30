@@ -104,7 +104,7 @@ def add_pipes_to_grid(grid, frame):
                 grid[pipe_y][pipe_x] = color
 
 def add_player_to_grid(grid, state, collisions):
-    dead = state["state"] == "dying"
+    dead = state["state"] in {"dying", "dead"}
     # I tried putting eyes in the bottom right to emphasize that we're falling
     # it feels like we should be able to do this but it ends up looking weird,
     # I think it's because the orientation of the eyes emoji doesn't change?
@@ -118,7 +118,6 @@ def add_player_to_grid(grid, state, collisions):
                 grid[y][x] = c
 
 def draw_grid(state, grid):
-    write_to_buf1 = state["write_to_buf1"]
     target_dir = buffer_to_write_to(state)
     files = sorted(
             (file for file in os.listdir(target_dir) if not file.startswith(".")),
@@ -135,7 +134,7 @@ def draw_grid(state, grid):
     
     # This is how applescript knows which directory to flip to
     print(target_dir.split("/")[-1])
-    state["write_to_buf1"] = not write_to_buf1
+    state["write_to_buf1"] = not state["write_to_buf1"]
 
 def check_for_collision(state):
     player_coords = set((x, y) for (x, y, _c) in all_player_coords(state))
@@ -189,17 +188,18 @@ def sleep_command(args):
             time.sleep(diff)
 
     state["tick_start_time"] = datetime.now()
-    write_state(state)
 
-    if state["state"] == "dying":
-        append_to_log(f"{state['player_y']}")
-    match state["frame"], state["state"], state["player_y"]:
-        case frame, _, _ if frame >= MAX_FRAME:
-            print("exit")
-        case _, "dying", y if y >= HEIGHT - 1:
-            print("exit")
+    if state["state"] == "dying" or state["state"] == "dead":
+        append_to_log(f"{state}")
+
+    match state["frame"], state["state"]:
+        case frame, _ if frame >= MAX_FRAME:
+            print("max-frame")
+        case _, "dead":
+            print("dead")
         case _:
             print("continue")
+    write_state(state)
 
 def handle_tick_running(state, count):
     flapped = count > 0
@@ -227,6 +227,8 @@ def handle_tick_running(state, count):
 
 def handle_tick_dying(state):
     player_y = state["player_y"] 
+    if player_y >= HEIGHT - 1:
+        state["state"] = "dead"
     player_y = min(player_y + 2, HEIGHT - 1)
     create_and_draw_grid(state, set())
     state["player_y"] = player_y
@@ -240,7 +242,7 @@ def tick_command(args):
             handle_tick_running(state, args.selection_count)
         case "ticking":
             handle_tick_running(state, args.selection_count)
-        case "dying":
+        case "dying" | "dead":
             handle_tick_dying(state)
 
 def initialize_command(args):

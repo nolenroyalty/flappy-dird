@@ -76,42 +76,40 @@ def initialize_buffers():
 
         for i in range(HEIGHT):
             os.symlink(f"{cwd}/{dir_}", f"{dir_}/{i}")
+
+def all_pipe_locations(x, frame, height, is_top):
+    x = x - frame
+    for pipe_x in range(x, x + PIPE_WIDTH):
+        if pipe_x < 0 or pipe_x >= WIDTH: continue
+        for pipe_y in range(height):
+            pipe_y = pipe_y if is_top else -pipe_y - 1
+            yield (pipe_x, pipe_y)
+
+def all_player_coords(state):
+    player_y = state["player_y"]
+    for x,y,c in ((0, 0, EYES), (-1, 0, WHITE), (0, 1, ORANGE), (-1, 1,YELLOW)):
+        yield (PLAYER_X + x, player_y + y, c)
     
 def add_pipes_to_grid(grid, frame):
     for (is_top, locations) in ((True, TOP), (False, BOTTOM)):
         for (x, height) in locations:
-            x = x - frame
-            for pipe_x in range(x, x + PIPE_WIDTH):
-                if pipe_x < 0: continue
-                if pipe_x >= WIDTH: continue
-                for pipe_y in range(height):
-                    color = BROWN if pipe_y + 2 == height else GREEN
-                    pipe_y = pipe_y if is_top else -pipe_y - 1
-                    grid[pipe_y][pipe_x] = color
+            for (pipe_x, pipe_y) in all_pipe_locations(x, frame, height, is_top):
+                second_to_last = False
+                if is_top: second_to_last = pipe_y + 2 == height
+                else: second_to_last = pipe_y == -height + 1
+                color = BROWN if second_to_last else GREEN
+                grid[pipe_y][pipe_x] = color
 
 def add_player_to_grid(grid, state):
     player_y = state["player_y"]
     fall_speed = state["fall_speed"]
 
-    if fall_speed == 2 and False:
-        # eyes in bottom right instead of emphasize that we're falling
-        # It feels like we should be able to do something like this but it ends
-        # up looking weird, I think because the orientation of the eyes emoji
-        # doesn't change.
-        # g
-        grid[player_y][PLAYER_X] = YELLOW
-        grid[player_y][PLAYER_X-1] = YELLOW
-        if player_y < HEIGHT - 1:
-            grid[player_y + 1][PLAYER_X] = EYES
-            grid[player_y + 1][PLAYER_X-1] = ORANGE
-    else:
-        grid[player_y][PLAYER_X] = EYES
-        #folder = WING1
-        #if state["frame"] % 2 == 0: folder = WING2
-        grid[player_y][PLAYER_X-1] = WHITE
-        if player_y < HEIGHT - 1:
-            grid[player_y + 1][PLAYER_X] = ORANGE
-            grid[player_y + 1][PLAYER_X-1] = YELLOW
+    # I tried putting eyes in the bottom right to emphasize that we're falling
+    # it feels like we should be able to do this but it ends up looking weird,
+    # I think it's because the orientation of the eyes emoji doesn't change?
+    for (x, y, c) in all_player_coords(state):
+        if y < HEIGHT - 1:
+            grid[y][x] = c
 
 def draw_grid(state, grid):
     write_to_buf1 = state["write_to_buf1"]
@@ -133,10 +131,20 @@ def draw_grid(state, grid):
     print(target_dir.split("/")[-1])
     state["write_to_buf1"] = not write_to_buf1
 
+#def check_for_collision(state):
+    #player_y = state["player_y"]
+    #player_coords = []
+    #for dy in (0, 1):
+        #for dx in (0, -1):
+            #y = player_y + dy
+            #x = PLAYER_x + dx
+            #player_coords.append((x, y))
+
 def create_and_draw_grid(state):
     grid = [[BLUE for _ in range(WIDTH)] for _ in range(HEIGHT)]
     add_pipes_to_grid(grid, state["frame"])
     add_player_to_grid(grid, state)
+    #check_for_collision()
     draw_grid(state, grid)
 
 def get_last_opened(state):

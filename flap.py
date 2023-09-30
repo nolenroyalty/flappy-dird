@@ -6,6 +6,7 @@ import json
 import os.path
 import time
 import subprocess
+import shutil
 from datetime import datetime
 import argparse
 
@@ -138,12 +139,6 @@ def create_and_draw_grid(state):
     add_player_to_grid(grid, state)
     draw_grid(state, grid)
 
-def initialize_command(args):
-    state = get_initial_state()
-    initialize_buffers()
-    create_and_draw_grid(state)
-    write_state(state)
-
 def get_last_opened(state):
     buffer = displayed_buffer(state)
     command = f"mdls -attr kMDItemLastUsedDate {buffer}"
@@ -203,6 +198,21 @@ def tick_command(args):
     state["frame"] += 1
     write_state(state)
 
+def initialize_command(args):
+    state = get_initial_state()
+    initialize_buffers()
+    create_and_draw_grid(state)
+    write_state(state)
+
+def first_time_setup_command(args):
+    my_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+    template = f"{my_dir}/template.applescript" 
+    target   = f"{my_dir}/flappy-dird.applescript"
+    if os.path.exists(target):
+        os.remove(target)
+    shutil.copy(template, target)
+    subprocess.check_output(["sed", "-i", "", f"s#@CWD#{my_dir}#g", target])
+
 def main():
     parser = argparse.ArgumentParser(description="Run foldy bird")
 
@@ -220,6 +230,9 @@ def main():
 
     sleep_parser = subparsers.add_parser("sleep", help="Sleep between ticks")
     sleep_parser.set_defaults(func=sleep_command)
+
+    first_time_setup = subparsers.add_parser("first-time-setup", help="One-time setup to prepare flappy dird")
+    first_time_setup.set_defaults(func=first_time_setup_command)
 
     args = parser.parse_args()
     if hasattr(args, "func"):

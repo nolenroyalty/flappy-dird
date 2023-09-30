@@ -261,11 +261,11 @@ def first_time_setup_command(args):
     subprocess.check_output(["sed", "-i", "", f"s#@CWD#{my_dir}#g", target])
 
 def main():
-    parser = argparse.ArgumentParser(description="Run foldy bird")
+    parser = argparse.ArgumentParser(description="Run flappy dird")
 
     subparsers = parser.add_subparsers(title="commands", dest="command")
 
-    initialize_parser = subparsers.add_parser("init", help="Initialize foldy bird")
+    initialize_parser = subparsers.add_parser("init", help="Initialize flappy dird")
     initialize_parser.set_defaults(func=initialize_command)
 
     tick_parser = subparsers.add_parser("tick", help="Run a game tick")

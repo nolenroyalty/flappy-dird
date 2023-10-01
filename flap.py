@@ -11,7 +11,8 @@ from datetime import datetime
 import argparse
 
 WIDTH = 15
-HEIGHT = 15
+HEIGHT = 20
+GROUND_HEIGHT = 2
 PIPE_WIDTH = 3
 PLAYER_X = 3
 TARGET_FPS = 4
@@ -85,7 +86,13 @@ def all_pipe_locations(x, frame, height, is_top):
     for pipe_x in range(x, x + PIPE_WIDTH):
         if pipe_x < 0 or pipe_x >= WIDTH: continue
         for pipe_y in range(height):
-            pipe_y = pipe_y if is_top else -pipe_y - 1
+            if is_top: # no remapping on top
+                pipe_y = pipe_y
+            else:
+                # e.g. 0 = 19, the last element, if HEIGHT = 20
+                pipe_y = HEIGHT - pipe_y - 1 
+                # last few elements don't contain a pipe
+                pipe_y -= GROUND_HEIGHT
             yield (pipe_x, pipe_y)
 
 def all_player_coords(state):
@@ -98,15 +105,19 @@ def add_pipes_to_grid(grid, frame):
         for (x, height) in locations:
             for (pipe_x, pipe_y) in all_pipe_locations(x, frame, height, is_top):
                 second_to_last = False
-                if is_top: second_to_last = pipe_y + 2 == height
-                else: second_to_last = pipe_y == -height + 1
-                color = BROWN if second_to_last else GREEN
+                if is_top: 
+                    second_to_last = pipe_y + 2 == height
+                else: 
+                    second_to_last_height = HEIGHT - GROUND_HEIGHT - 1
+                    second_to_last_height = second_to_last_height - height + 2
+                    second_to_last = (pipe_y == second_to_last_height)
+                color = WHITE if second_to_last else GREEN
                 grid[pipe_y][pipe_x] = color
 
 def add_player_to_grid(grid, state, collisions):
     dead = state["state"] in {"dying", "dead"}
     # I tried putting eyes in the bottom right to emphasize that we're falling
-    # it feels like we should be able to do this but it ends up looking weird,
+    ## it feels like we should be able to do this but it ends up looking weird,
     # I think it's because the orientation of the eyes emoji doesn't change?
     for (x, y, c) in all_player_coords(state):
         if y < HEIGHT:
@@ -128,7 +139,10 @@ def draw_grid(state, grid):
         grid = "".join(grid)
         grid = os.path.join(target_dir, f"{grid} {idx}")
 
-        # We touch the file to ensure its mtime gets updated
+        # We touch the file to ensure its mtime gets updated. This matters
+        # because we assume finder is sorting by "Date Modified"
+        # sorting by name also works but finder sometimes seems to apply the
+        # sort only *after* displaying the files.
         if file != grid: os.rename(file, grid)
         else: subprocess.check_output(["touch", file])
     
@@ -144,14 +158,16 @@ def check_for_collision(state):
     for (is_top, locations) in ((True, TOP), (False, BOTTOM)):
         for (x, height) in locations:
             for (pipe_x, pipe_y) in all_pipe_locations(x, frame, height, is_top):
-                # This is gross but it's annoying to do the conversion elsewhere
-                if pipe_y < 0: pipe_y += HEIGHT
                 if (pipe_x, pipe_y) in player_coords:
                     collisions.add((pipe_x, pipe_y))
     return collisions
 
 def create_and_draw_grid(state, collisions):
-    grid = [[BLUE for _ in range(WIDTH)] for _ in range(HEIGHT)]
+    grid = []
+    for h in range(HEIGHT):
+        if h + GROUND_HEIGHT >= HEIGHT: color = BROWN
+        else: color = BLUE
+        grid.append([color for _ in range(WIDTH)])
     add_pipes_to_grid(grid, state["frame"])
     add_player_to_grid(grid, state, collisions)
     draw_grid(state, grid)
@@ -192,13 +208,14 @@ def sleep_command(args):
     if state["state"] == "dying" or state["state"] == "dead":
         append_to_log(f"{state}")
 
-    match state["frame"], state["state"]:
-        case frame, _ if frame >= MAX_FRAME:
-            print("max-frame")
-        case _, "dead":
-            print("dead")
-        case _:
-            print("continue")
+    # This is read back by applescript and determines when applescript
+    # stops looping. The "stop looping" condition is just whether
+    # this string is "continue" or not - we use different values
+    # here just for some simple debugging.
+    if state["frame"] >= MAX_FRAME: print("max-frame")
+    elif state["state"] == "dead":  print("dead")
+    else:                           print("continue")
+
     write_state(state)
 
 def handle_tick_running(state, count):
@@ -217,8 +234,8 @@ def handle_tick_running(state, count):
     state["flapped_on_prior_frame"] = flapped
     state["fall_speed"] = fall_speed
     state["player_y"] = player_y
-
     collisions = check_for_collision(state)
+
     create_and_draw_grid(state, collisions)
     if collisions:
         state["state"] = "dying"
@@ -227,9 +244,9 @@ def handle_tick_running(state, count):
 
 def handle_tick_dying(state):
     player_y = state["player_y"] 
-    if player_y >= HEIGHT - 1:
+    if player_y >= HEIGHT - 1 - GROUND_HEIGHT:
         state["state"] = "dead"
-    player_y = min(player_y + 2, HEIGHT - 1)
+    player_y = min(player_y + 2, HEIGHT - 1 - GROUND_HEIGHT)
     create_and_draw_grid(state, set())
     state["player_y"] = player_y
     write_state(state)

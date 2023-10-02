@@ -44,6 +44,7 @@ EYES   = "👀"
 NUMBERS = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
 NUMBERS = {str(i):NUMBERS[i] for i in range(len(NUMBERS))}
 GEM = "💎"
+TROPHY = "🏆"
 GRID = []
 
 PipePair = namedtuple("PipePair", ["x", "midpoint", "space_between_top_and_bottom"])
@@ -80,7 +81,11 @@ def read_state():
 
 def get_initial_state():
     first_two_pairs = [PipePair(12, 8, 8), PipePair(20, 9, 9)]
-    state = {"frame": 0, 
+    state = {}
+    if os.path.exists(STATE_FILE):
+        state = read_state()
+
+    initial = {"frame": 0, 
              "write_to_buf1": True,
              "player_y": 5,
              "fall_speed": 0,
@@ -90,6 +95,13 @@ def get_initial_state():
              "pipes": first_two_pairs,
              "score": 8,
              }
+
+    for k, v in initial.items(): 
+        state[k] = v
+
+    if "high_score" not in state: 
+        state["high_score"] = 0
+
     return state
 
 def get_top_and_bottom(state):
@@ -172,12 +184,15 @@ def add_player_to_grid(state, collisions):
                 GRID[y][x] = c
 
 def add_score_to_grid(state):
-    score = state["score"]
-    emojis = "".join(NUMBERS[s] for s in str(score))
-    # Unicode chars have a length greater than one!
-    emoji_len = len(str(score)) + 1
-    GRID[SCORE_LINE][-2] = GEM
-    GRID[SCORE_LINE+1][-emoji_len:-1] = emojis
+    def add_aux(line, score, icon):
+        emojis = "".join(NUMBERS[s] for s in str(score))
+        # unicode chars have a length greater than one!
+        emoji_len = len(str(score)) + 1
+        GRID[line][-2] = icon
+        GRID[line][-emoji_len-2:-3] = emojis
+
+    add_aux(SCORE_LINE, state["score"], GEM)
+    add_aux(SCORE_LINE+1, state["high_score"], TROPHY)
 
 def write_grid(state):
     target_dir = buffer_to_write_to(state)
@@ -248,7 +263,7 @@ def sleep_command(args):
     state["tick_start_time"] = datetime.now()
 
     if state["state"] == "dying" or state["state"] == "dead":
-        append_to_log(f"{state}")
+        append_to_log(f"DYING/DEAD: {state}")
 
     # This is read back by applescript and determines when applescript
     # stops looping. The "stop looping" condition is just whether
@@ -259,7 +274,6 @@ def sleep_command(args):
     elif state["state"] == "dead":
         print("dead")
     else:                           
-        append_to_log(f"OK {state}")
         if state["state"] == "ticking":
             state["frame"] += 1
         print("continue")
@@ -286,6 +300,8 @@ def prune_and_maybe_add_pipe(state):
 def maybe_increment_score(state):
     if state["pipes"][0].x == PLAYER_X + state["frame"]:
         state["score"] += 1
+
+    state["high_score"] = max(state["score"], state["high_score"])
 
 def handle_tick_running(state, count):
     prune_and_maybe_add_pipe(state)

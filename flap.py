@@ -20,6 +20,7 @@ PLAYER_X = 3
 TARGET_FPS = 4
 TARGET_FRAMETIME = 1.0 / TARGET_FPS
 MAX_FRAME = 100
+SCORE_LINE = -2
 
 BUFFER_1 = "./buf1"
 BUFFER_2 = "./buf2"
@@ -28,6 +29,8 @@ STATE_FILE = "./state.json"
 BLUE   = "🟦"
 GREEN  = "🟩"
 WHITE  = "⬜️"
+# ig proposed using folders for "flapping" which is a *great* idea but doesn't quite work
+# out in practice :/. Maybe revisit.
 WING1  = "📂"
 WING2  = "📁"
 BROWN =  "🟫"
@@ -36,9 +39,12 @@ ORANGE = "🟧"
 X      = "❌"
 RED    = "🟥"
 EYES   = "👀"
+NUMBERS = "0️⃣1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣8️⃣9️⃣"
+NUMBERS = {str(i):NUMBERS[i] for i in range(len(NUMBERS))}
+GEM = "💎"
+GRID = []
 
 PipePair = namedtuple("PipePair", ["x", "midpoint", "space_between_top_and_bottom"])
-
 def generate_random_pipe(x):
     highest_midpoint = 5
     lowest_midpoint = 12
@@ -71,7 +77,7 @@ def read_state():
         return d
 
 def get_initial_state():
-    first_two_pairs = [PipePair(10, 8, 8), PipePair(18, 9, 9)]
+    first_two_pairs = [PipePair(12, 8, 8), PipePair(20, 9, 9)]
     state = {"frame": 0, 
              "write_to_buf1": True,
              "player_y": 5,
@@ -80,6 +86,7 @@ def get_initial_state():
              "flapped_on_prior_frame": False,
              "state": "waiting",
              "pipes": first_two_pairs,
+             "score": 0,
              }
     return state
 
@@ -125,8 +132,14 @@ def all_player_coords(state):
     player_y = state["player_y"]
     for x,y,c in ((0, 0, EYES), (-1, 0, WHITE), (0, 1, ORANGE), (-1, 1,YELLOW)):
         yield (PLAYER_X + x, player_y + y, c)
+
+def initialize_grid():
+    for h in range(HEIGHT):
+        if h + GROUND_HEIGHT >= HEIGHT: color = BROWN
+        else: color = BLUE
+        GRID.append([color for _ in range(WIDTH)])
     
-def add_pipes_to_grid(grid, state):
+def add_pipes_to_grid(state):
     frame = state["frame"]
     top, bottom = get_top_and_bottom(state)
     for (locations, is_top) in [(top, True), (bottom, False)]:
@@ -140,9 +153,9 @@ def add_pipes_to_grid(grid, state):
                     second_to_last_height = second_to_last_height - height + 2
                     second_to_last = (pipe_y == second_to_last_height)
                 color = WHITE if second_to_last else GREEN
-                grid[pipe_y][pipe_x] = color
+                GRID[pipe_y][pipe_x] = color
 
-def add_player_to_grid(grid, state, collisions):
+def add_player_to_grid(state, collisions):
     dead = state["state"] in {"dying", "dead"}
     # I tried putting eyes in the bottom right to emphasize that we're falling
     ## it feels like we should be able to do this but it ends up looking weird,
@@ -150,28 +163,33 @@ def add_player_to_grid(grid, state, collisions):
     for (x, y, c) in all_player_coords(state):
         if y < HEIGHT:
             if (x, y) in collisions:
-                grid[y][x] = X
+                GRID[y][x] = X
             elif dead and c != EYES:
-                grid[y][x] = RED
+                GRID[y][x] = RED
             else:
-                grid[y][x] = c
+                GRID[y][x] = c
 
-def draw_grid(state, grid):
+def add_score_to_grid(state):
+    score = state["score"]
+    emojis = "".join(NUMBERS[s] for s in str(score))
+    emojis = GEM + emojis
+
+def write_grid(state):
     target_dir = buffer_to_write_to(state)
     files = sorted(
             (file for file in os.listdir(target_dir) if not file.startswith(".")),
             key=lambda x:int(x.split(" ")[-1]))
 
-    for idx, (file, grid) in enumerate(zip(files, grid)):
+    for idx, (file, gridline) in enumerate(zip(files, GRID)):
         file = os.path.join(target_dir, file)
-        grid = "".join(grid)
-        grid = os.path.join(target_dir, f"{grid} {idx}")
+        gridline = "".join(gridline)
+        gridline = os.path.join(target_dir, f"{gridline} {idx}")
 
         # We touch the file to ensure its mtime gets updated. This matters
         # because we assume finder is sorting by "Date Modified"
         # sorting by name also works but finder sometimes seems to apply the
         # sort only *after* displaying the files.
-        if file != grid: os.rename(file, grid)
+        if file != gridline: os.rename(file, gridline)
         else: subprocess.check_output(["touch", file])
     
     # This is how applescript knows which directory to flip to
@@ -190,16 +208,6 @@ def check_for_collision(state):
                 if (pipe_x, pipe_y) in player_coords:
                     collisions.add((pipe_x, pipe_y))
     return collisions
-
-def create_and_draw_grid(state, collisions):
-    grid = []
-    for h in range(HEIGHT):
-        if h + GROUND_HEIGHT >= HEIGHT: color = BROWN
-        else: color = BLUE
-        grid.append([color for _ in range(WIDTH)])
-    add_pipes_to_grid(grid, state)
-    add_player_to_grid(grid, state, collisions)
-    draw_grid(state, grid)
 
 def get_last_opened(state):
     buffer = displayed_buffer(state)
@@ -241,9 +249,15 @@ def sleep_command(args):
     # stops looping. The "stop looping" condition is just whether
     # this string is "continue" or not - we use different values
     # here just for some simple debugging.
-    if state["frame"] >= MAX_FRAME: print("max-frame")
-    elif state["state"] == "dead":  print("dead")
-    else:                           print("continue")
+    if state["frame"] >= MAX_FRAME:
+        print("max-frame")
+    elif state["state"] == "dead":
+        print("dead")
+    else:                           
+        append_to_log(f"OK {state}")
+        if state["state"] == "ticking":
+            state["frame"] += 1
+        print("continue")
 
     write_state(state)
 
@@ -264,6 +278,10 @@ def prune_and_maybe_add_pipe(state):
         new_pipes.append(pipe)
     state["pipes"] = new_pipes
 
+def maybe_increment_score(state):
+    if state["pipes"][0].x == PLAYER_X + state["frame"]:
+        state["score"] += 1
+
 def handle_tick_running(state, count):
     prune_and_maybe_add_pipe(state)
     flapped = count > 0
@@ -283,38 +301,49 @@ def handle_tick_running(state, count):
     state["player_y"] = player_y
     collisions = check_for_collision(state)
 
-    create_and_draw_grid(state, collisions)
     if collisions:
         state["state"] = "dying"
-    state["frame"] += 1
-    write_state(state)
+    else:
+        maybe_increment_score(state)
+
+    return collisions
 
 def handle_tick_dying(state):
     player_y = state["player_y"] 
     if player_y >= HEIGHT - 1 - GROUND_HEIGHT:
         state["state"] = "dead"
     player_y = min(player_y + 2, HEIGHT - 1 - GROUND_HEIGHT)
-    create_and_draw_grid(state, set())
     state["player_y"] = player_y
-    write_state(state)
+
+def create_and_write_grid(state, collisions):
+    initialize_grid()
+    add_pipes_to_grid(state)
+    add_player_to_grid(state, collisions)
+    add_score_to_grid(state)
+    write_grid(state)
 
 def tick_command(args):
     state = read_state()
+
     match state["state"]:
         case "waiting":
             state["state"] = "ticking"
-            handle_tick_running(state, args.selection_count)
+            collisions = handle_tick_running(state, args.selection_count)
         case "ticking":
-            handle_tick_running(state, args.selection_count)
+            collisions = handle_tick_running(state, args.selection_count)
         case "dying" | "dead":
             handle_tick_dying(state)
+            collisions = set()
+
+    create_and_write_grid(state, collisions)
+    write_state(state)
 
 def initialize_command(args):
     state = get_initial_state()
     initialize_buffers()
-    create_and_draw_grid(state, set())
     if os.path.exists("log"):
         os.remove("log")
+    create_and_write_grid(state, set())
     write_state(state)
 
 def first_time_setup_command(args):

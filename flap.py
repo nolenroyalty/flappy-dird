@@ -97,7 +97,7 @@ def get_initial_state():
     initial = {"frame": 0, 
              "write_to_buf1": True,
              "player_y": 5,
-             "fall_speed": 0,
+             "fall_speed": -3,
              "tick_start_time": None,
              "flapped_on_prior_frame": False,
              "state": "waiting",

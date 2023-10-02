@@ -9,6 +9,8 @@ import subprocess
 import shutil
 from datetime import datetime
 import argparse
+import random
+from collections import namedtuple
 
 WIDTH = 15
 HEIGHT = 20
@@ -17,7 +19,7 @@ PIPE_WIDTH = 3
 PLAYER_X = 3
 TARGET_FPS = 4
 TARGET_FRAMETIME = 1.0 / TARGET_FPS
-MAX_FRAME = 40
+MAX_FRAME = 100
 
 BUFFER_1 = "./buf1"
 BUFFER_2 = "./buf2"
@@ -35,8 +37,26 @@ X      = "❌"
 RED    = "🟥"
 EYES   = "👀"
 
-BOTTOM = [(10, 4), (24, 4), (38, 6)]
-TOP = [(16, 4), (24, 4), (30, 6)]
+PipePair = namedtuple("PipePair", ["x", "midpoint", "space_between_top_and_bottom"])
+
+def generate_random_pipe(x):
+    highest_midpoint = 5
+    lowest_midpoint = 12
+    midpoint = random.randint(5, 12)
+
+    min_space = 5
+    max_space = 8
+    space_between_top_and_bottom = random.randint(min_space, max_space)
+    return PipePair(x=x,
+                    midpoint=midpoint,
+                    space_between_top_and_bottom=space_between_top_and_bottom)
+
+def to_top_and_bottom(pipe):
+    half_of_space = pipe.space_between_top_and_bottom // 2
+    top_height = pipe.midpoint - half_of_space - pipe.space_between_top_and_bottom % 2
+    bottom_height = HEIGHT - GROUND_HEIGHT - pipe.midpoint - half_of_space
+
+    return (pipe.x, top_height), (pipe.x, bottom_height)
 
 def write_state(state):
     with open(STATE_FILE, "w") as f:
@@ -47,18 +67,24 @@ def read_state():
         d = json.loads(f.read().strip())
         if d["tick_start_time"]:
             d["tick_start_time"] = datetime.fromisoformat(d["tick_start_time"])
+        d["pipes"] = [PipePair(*pipe) for pipe in d["pipes"]]
         return d
 
 def get_initial_state():
+    first_two_pairs = [PipePair(10, 8, 8), PipePair(18, 9, 9)]
     state = {"frame": 0, 
              "write_to_buf1": True,
              "player_y": 5,
              "fall_speed": 0,
              "tick_start_time": None,
              "flapped_on_prior_frame": False,
-             "state": "waiting"
+             "state": "waiting",
+             "pipes": first_two_pairs,
              }
     return state
+
+def get_top_and_bottom(state):
+    return zip(*[to_top_and_bottom(p) for p in state["pipes"]])
 
 def displayed_buffer(state):
     if state["write_to_buf1"]: return BUFFER_2
@@ -100,8 +126,10 @@ def all_player_coords(state):
     for x,y,c in ((0, 0, EYES), (-1, 0, WHITE), (0, 1, ORANGE), (-1, 1,YELLOW)):
         yield (PLAYER_X + x, player_y + y, c)
     
-def add_pipes_to_grid(grid, frame):
-    for (is_top, locations) in ((True, TOP), (False, BOTTOM)):
+def add_pipes_to_grid(grid, state):
+    frame = state["frame"]
+    top, bottom = get_top_and_bottom(state)
+    for (locations, is_top) in [(top, True), (bottom, False)]:
         for (x, height) in locations:
             for (pipe_x, pipe_y) in all_pipe_locations(x, frame, height, is_top):
                 second_to_last = False
@@ -155,7 +183,8 @@ def check_for_collision(state):
 
     frame = state["frame"]
     collisions = set()
-    for (is_top, locations) in ((True, TOP), (False, BOTTOM)):
+    top, bottom = get_top_and_bottom(state)
+    for (locations, is_top) in [(top, True), (bottom, False)]:
         for (x, height) in locations:
             for (pipe_x, pipe_y) in all_pipe_locations(x, frame, height, is_top):
                 if (pipe_x, pipe_y) in player_coords:
@@ -168,7 +197,7 @@ def create_and_draw_grid(state, collisions):
         if h + GROUND_HEIGHT >= HEIGHT: color = BROWN
         else: color = BLUE
         grid.append([color for _ in range(WIDTH)])
-    add_pipes_to_grid(grid, state["frame"])
+    add_pipes_to_grid(grid, state)
     add_player_to_grid(grid, state, collisions)
     draw_grid(state, grid)
 
@@ -218,7 +247,25 @@ def sleep_command(args):
 
     write_state(state)
 
+def prune_and_maybe_add_pipe(state):
+    new_pipes = []
+    for pipe in state["pipes"]:
+        if pipe.x + PIPE_WIDTH - state["frame"] < 0: 
+            append_to_log(f"PRUNE %{pipe}")
+            continue
+        else: new_pipes.append(pipe)
+
+    # This is a pretty boring / simple heuristic and it might
+    # be nice to add a little randomness here
+    if len(new_pipes) < len(state["pipes"]):
+        x = WIDTH + 1 + state["frame"]
+        pipe = generate_random_pipe(x)
+        append_to_log(f"GEN NEW PIPE {pipe}")
+        new_pipes.append(pipe)
+    state["pipes"] = new_pipes
+
 def handle_tick_running(state, count):
+    prune_and_maybe_add_pipe(state)
     flapped = count > 0
     fall_speed = state["fall_speed"]
     player_y = state["player_y"]

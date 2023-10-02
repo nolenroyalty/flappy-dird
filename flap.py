@@ -40,6 +40,8 @@ ORANGE = "🟧"
 X      = "❌"
 RED    = "🟥"
 EYES   = "👀"
+COOL   = "🆒"
+STARTING_AD_SPACING = "                                                                  "
 # You might be inclined to put these in a string and index into that string but
 # indexing into unicode strings is *hard*
 NUMBERS = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
@@ -50,7 +52,6 @@ LETTERS[" "] = " "
 def letterify(s): return "".join(LETTERS[c] for c in s)
 POINT_RIGHT = "👉"
 POINT_LEFT  = "👈"
-#DIRECTIVE_START = "𝑫𝑶𝑼𝑩𝑳𝑬 𝑪𝑳𝑰𝑪𝑲 𝑻𝑶 𝑺𝑻𝑨𝑹𝑻"
 GEM = "💎"
 TROPHY = "🏆"
 GRID = []
@@ -133,6 +134,8 @@ def initialize_buffers():
             if file.startswith("."): continue
             os.remove(f"{cwd}/{dir_}/{file}")
 
+        os.symlink(f"{cwd}/{dir_}", f"{dir_}/{COOL}")
+
         for i in range(HEIGHT):
             os.symlink(f"{cwd}/{dir_}", f"{dir_}/{i}")
 
@@ -204,6 +207,9 @@ def add_score_to_grid(state):
     add_aux(SCORE_LINE, state["score"], GEM)
     add_aux(SCORE_LINE+1, state["high_score"], TROPHY)
 
+def add_banner_to_grid(banner):
+    GRID.insert(0, f"{COOL}{banner}")
+
 def add_directive_to_grid(directive):
     letters = letterify(directive)
     text = f"{POINT_RIGHT} {letters}"
@@ -212,6 +218,9 @@ def add_directive_to_grid(directive):
 def file_sort_key(filename):
     # Directive, goes at the bottom
     if POINT_RIGHT in filename: return HEIGHT*2
+    # Banner, goes at the top
+    if COOL in filename: 
+        return -1
     return int(filename.split(" ")[-1])
 
 def write_grid(state):
@@ -219,7 +228,6 @@ def write_grid(state):
     files = sorted(
             (file for file in os.listdir(target_dir) if not file.startswith(".")),
             key=file_sort_key)
-            #key=lambda x:int(x.split(" ")[-1]))
 
     for idx, (file, gridline) in enumerate(zip(files, GRID)):
         file = os.path.join(target_dir, file)
@@ -227,6 +235,8 @@ def write_grid(state):
         suffix = idx
         if POINT_RIGHT in gridline:
             suffix = f" {POINT_LEFT}"
+        if COOL in gridline:
+            suffix = ""
         gridline = os.path.join(target_dir, f"{gridline} {suffix}")
 
         # We touch the file to ensure its mtime gets updated. This matters
@@ -367,13 +377,15 @@ def handle_tick_dying(state):
     state["player_y"] = player_y
     return directive
 
-def create_and_write_grid(state, directive, collisions):
+def create_and_write_grid(state, directive, banner, collisions):
     initialize_grid()
     add_pipes_to_grid(state)
     add_player_to_grid(state, collisions)
     add_score_to_grid(state)
     if directive: 
         add_directive_to_grid(directive)
+    if banner:
+        add_banner_to_grid(banner)
     write_grid(state)
 
 def tick_command(args):
@@ -391,7 +403,7 @@ def tick_command(args):
             directive = handle_tick_dying(state)
             collisions = set()
 
-    create_and_write_grid(state, directive, collisions)
+    create_and_write_grid(state, directive, COOL, collisions)
     write_state(state)
 
 def initialize_command(args):
@@ -399,7 +411,7 @@ def initialize_command(args):
     initialize_buffers()
     if os.path.exists("log"):
         os.remove("log")
-    create_and_write_grid(state, "double click to start", set())
+    create_and_write_grid(state, "double click to start", COOL, set())
     write_state(state)
 
 def first_time_setup_command(args):

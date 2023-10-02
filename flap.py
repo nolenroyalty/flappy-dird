@@ -11,6 +11,7 @@ from datetime import datetime
 import argparse
 import random
 from collections import namedtuple
+import string
 
 WIDTH = 15
 HEIGHT = 20
@@ -43,6 +44,13 @@ EYES   = "👀"
 # indexing into unicode strings is *hard*
 NUMBERS = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
 NUMBERS = {str(i):NUMBERS[i] for i in range(len(NUMBERS))}
+LETTERS = ["𝑨", "𝑩", "𝑪", "𝑫", "𝑬", "𝑭", "𝑮", "𝑯", "𝑰", "𝑱", "𝑲", "𝑳", "𝑴", "𝑵", "𝑶", "𝑷", "𝑸", "𝑹", "𝑺", "𝑻", "𝑼", "𝑽", "𝑾", "𝑿", "𝒀", "𝒁"]
+LETTERS = dict(zip(string.ascii_lowercase, LETTERS))
+LETTERS[" "] = " "
+def letterify(s): return "".join(LETTERS[c] for c in s)
+POINT_RIGHT = "👉"
+POINT_LEFT  = "👈"
+#DIRECTIVE_START = "𝑫𝑶𝑼𝑩𝑳𝑬 𝑪𝑳𝑰𝑪𝑲 𝑻𝑶 𝑺𝑻𝑨𝑹𝑻"
 GEM = "💎"
 TROPHY = "🏆"
 GRID = []
@@ -128,6 +136,8 @@ def initialize_buffers():
         for i in range(HEIGHT):
             os.symlink(f"{cwd}/{dir_}", f"{dir_}/{i}")
 
+        os.symlink(f"{cwd}/{dir_}", f"{dir_}/{POINT_RIGHT}")
+
 def all_pipe_locations(x, frame, height, is_top):
     x = x - frame
     for pipe_x in range(x, x + PIPE_WIDTH):
@@ -194,16 +204,30 @@ def add_score_to_grid(state):
     add_aux(SCORE_LINE, state["score"], GEM)
     add_aux(SCORE_LINE+1, state["high_score"], TROPHY)
 
+def add_directive_to_grid(directive):
+    letters = letterify(directive)
+    text = f"{POINT_RIGHT} {letters}"
+    GRID.append(text)
+
+def file_sort_key(filename):
+    # Directive, goes at the bottom
+    if POINT_RIGHT in filename: return HEIGHT*2
+    return int(filename.split(" ")[-1])
+
 def write_grid(state):
     target_dir = buffer_to_write_to(state)
     files = sorted(
             (file for file in os.listdir(target_dir) if not file.startswith(".")),
-            key=lambda x:int(x.split(" ")[-1]))
+            key=file_sort_key)
+            #key=lambda x:int(x.split(" ")[-1]))
 
     for idx, (file, gridline) in enumerate(zip(files, GRID)):
         file = os.path.join(target_dir, file)
         gridline = "".join(gridline)
-        gridline = os.path.join(target_dir, f"{gridline} {idx}")
+        suffix = idx
+        if POINT_RIGHT in gridline:
+            suffix = f" {POINT_LEFT}"
+        gridline = os.path.join(target_dir, f"{gridline} {suffix}")
 
         # We touch the file to ensure its mtime gets updated. This matters
         # because we assume finder is sorting by "Date Modified"
@@ -334,17 +358,22 @@ def handle_tick_running(state, count):
     return collisions
 
 def handle_tick_dying(state):
+    directive = "game over"
     player_y = state["player_y"] 
     if player_y >= HEIGHT - 1 - GROUND_HEIGHT:
         state["state"] = "dead"
+        directive = "double click to restart"
     player_y = min(player_y + 2, HEIGHT - 1 - GROUND_HEIGHT)
     state["player_y"] = player_y
+    return directive
 
-def create_and_write_grid(state, collisions):
+def create_and_write_grid(state, directive, collisions):
     initialize_grid()
     add_pipes_to_grid(state)
     add_player_to_grid(state, collisions)
     add_score_to_grid(state)
+    if directive: 
+        add_directive_to_grid(directive)
     write_grid(state)
 
 def tick_command(args):
@@ -354,13 +383,15 @@ def tick_command(args):
         case "waiting":
             state["state"] = "ticking"
             collisions = handle_tick_running(state, args.selection_count)
+            directive = "click to flap"
         case "ticking":
             collisions = handle_tick_running(state, args.selection_count)
+            directive = "click to flap"
         case "dying" | "dead":
-            handle_tick_dying(state)
+            directive = handle_tick_dying(state)
             collisions = set()
 
-    create_and_write_grid(state, collisions)
+    create_and_write_grid(state, directive, collisions)
     write_state(state)
 
 def initialize_command(args):
@@ -368,7 +399,7 @@ def initialize_command(args):
     initialize_buffers()
     if os.path.exists("log"):
         os.remove("log")
-    create_and_write_grid(state, set())
+    create_and_write_grid(state, "double click to start", set())
     write_state(state)
 
 def first_time_setup_command(args):

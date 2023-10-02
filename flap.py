@@ -319,7 +319,7 @@ def handle_tick_running(state, count):
         player_y = max(player_y - movement, 0)
     else:
         fall_speed = min(2, fall_speed + 1)
-        player_y = min(player_y + fall_speed, HEIGHT - 1)
+        player_y = min(max(player_y + fall_speed,0), HEIGHT - 1)
 
     state["flapped_on_prior_frame"] = flapped
     state["fall_speed"] = fall_speed

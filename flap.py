@@ -39,7 +39,9 @@ ORANGE = "🟧"
 X      = "❌"
 RED    = "🟥"
 EYES   = "👀"
-NUMBERS = "0️⃣1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣8️⃣9️⃣"
+# You might be inclined to put these in a string and index into that string but
+# indexing into unicode strings is *hard*
+NUMBERS = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
 NUMBERS = {str(i):NUMBERS[i] for i in range(len(NUMBERS))}
 GEM = "💎"
 GRID = []
@@ -86,7 +88,7 @@ def get_initial_state():
              "flapped_on_prior_frame": False,
              "state": "waiting",
              "pipes": first_two_pairs,
-             "score": 0,
+             "score": 8,
              }
     return state
 
@@ -172,7 +174,10 @@ def add_player_to_grid(state, collisions):
 def add_score_to_grid(state):
     score = state["score"]
     emojis = "".join(NUMBERS[s] for s in str(score))
-    emojis = GEM + emojis
+    # Unicode chars have a length greater than one!
+    emoji_len = len(str(score)) + 1
+    GRID[SCORE_LINE][-2] = GEM
+    GRID[SCORE_LINE+1][-emoji_len:-1] = emojis
 
 def write_grid(state):
     target_dir = buffer_to_write_to(state)

@@ -227,6 +227,10 @@ def check_for_collision(state):
             for (pipe_x, pipe_y) in all_pipe_locations(x, frame, height, is_top):
                 if (pipe_x, pipe_y) in player_coords:
                     collisions.add((pipe_x, pipe_y))
+
+    for (x, y) in player_coords:
+        if y >= HEIGHT - GROUND_HEIGHT:
+            collisions.add((x, y))
     return collisions
 
 def get_last_opened(state):

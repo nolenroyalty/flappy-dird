@@ -211,8 +211,10 @@ def add_banner_to_grid(banner):
     GRID.insert(0, f"{COOL}{banner}")
 
 def add_directive_to_grid(directive):
-    letters = letterify(directive)
-    text = f"{POINT_RIGHT} {letters}"
+    spaces, letters = directive
+    letters = letterify(letters)
+    spaces = " " * spaces
+    text = f"{spaces}{POINT_RIGHT} {letters}"
     GRID.append(text)
 
 def file_sort_key(filename):
@@ -368,11 +370,11 @@ def handle_tick_running(state, count):
     return collisions
 
 def handle_tick_dying(state):
-    directive = "game over"
+    directive = 20, "game over"
     player_y = state["player_y"] 
     if player_y >= HEIGHT - 1 - GROUND_HEIGHT:
         state["state"] = "dead"
-        directive = "double click to restart"
+        directive = 6, "double click to restart"
     player_y = min(player_y + 2, HEIGHT - 1 - GROUND_HEIGHT)
     state["player_y"] = player_y
     return directive
@@ -395,10 +397,10 @@ def tick_command(args):
         case "waiting":
             state["state"] = "ticking"
             collisions = handle_tick_running(state, args.selection_count)
-            directive = "click to flap"
+            directive = 17, "click to flap"
         case "ticking":
             collisions = handle_tick_running(state, args.selection_count)
-            directive = "click to flap"
+            directive = 17, "click to flap"
         case "dying" | "dead":
             directive = handle_tick_dying(state)
             collisions = set()
@@ -411,7 +413,7 @@ def initialize_command(args):
     initialize_buffers()
     if os.path.exists("log"):
         os.remove("log")
-    create_and_write_grid(state, "double click to start", COOL, set())
+    create_and_write_grid(state, (8, "double click to start"), COOL, set())
     write_state(state)
 
 def first_time_setup_command(args):

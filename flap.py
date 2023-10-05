@@ -41,20 +41,31 @@ X      = "❌"
 RED    = "🟥"
 EYES   = "👀"
 COOL   = "🆒"
-STARTING_AD_SPACING = "                                                                  "
+PLANE  = "✈️"
+STARTING_AD_SPACING = len("                                                                  ")
 # You might be inclined to put these in a string and index into that string but
 # indexing into unicode strings is *hard*
 NUMBERS = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
 NUMBERS = {str(i):NUMBERS[i] for i in range(len(NUMBERS))}
 LETTERS = ["𝑨", "𝑩", "𝑪", "𝑫", "𝑬", "𝑭", "𝑮", "𝑯", "𝑰", "𝑱", "𝑲", "𝑳", "𝑴", "𝑵", "𝑶", "𝑷", "𝑸", "𝑹", "𝑺", "𝑻", "𝑼", "𝑽", "𝑾", "𝑿", "𝒀", "𝒁"]
 LETTERS = dict(zip(string.ascii_lowercase, LETTERS))
-LETTERS[" "] = " "
+for c in (" ", "|", ".", "1", "0", ","):
+    LETTERS[c] = c
 def letterify(s): return "".join(LETTERS[c] for c in s)
 POINT_RIGHT = "👉"
 POINT_LEFT  = "👈"
 GEM = "💎"
 TROPHY = "🏆"
 GRID = []
+_AD_TEXTS = [ ("you are the 1,000,000th visitor to this finder window", ), 
+      ("hot", "UU🌶️", "local singles", "UU🦹", "in your area are waiting to chat"),
+      ("made by eieio | check out eieio.games for more"),
+      ("UU🦧", "bonzo buddy toolbar free download", "UU🦍"),
+     ]
+AD_TEXTS = []
+for ad in _AD_TEXTS:
+    AD_TEXTS.append([text if text.startswith("UU") else letterify(text) for text in ad])
+AD_STARTING_PADDING_SPACES = 70
 
 PipePair = namedtuple("PipePair", ["x", "midpoint", "space_between_top_and_bottom"])
 def generate_random_pipe(x):
@@ -207,8 +218,69 @@ def add_score_to_grid(state):
     add_aux(SCORE_LINE, state["score"], GEM)
     add_aux(SCORE_LINE+1, state["high_score"], TROPHY)
 
-def add_banner_to_grid(banner):
-    GRID.insert(0, f"{COOL}{banner}")
+
+class READ_STATE:
+    READ_SOME = 1
+    READ_ALL__BEGIN_SKIPPING = 2
+    SKIPPED_ALL = 3
+
+def read_n_ad_chars(ad, skip, take):
+    ad = list(ad)
+    # returns: text, count, took all
+    def read_some(subloc, number):
+        text = ad[subloc]
+        if text.startswith("UU"):
+            return (text[2:], 2, True)
+        else:
+            count = min(number, len(text))
+            took_all = len(text) <= number
+            return (text[:number], count, took_all)
+
+    subloc = 0
+    while skip > 0:
+        if subloc >= len(ad):
+            # god damn the lack of variants in this cursed language
+            return (READ_STATE.SKIPPED_ALL, "")
+        _, count, took_all = read_some(subloc, skip)
+        if took_all:
+            skip -= count
+            subloc += 1
+        else:
+            skip = 0
+            ad[subloc] = ad[subloc][count:]
+
+    s = ""
+    subloc = 0
+    while take > 0:
+        if subloc >= len(ad):
+            return (READ_STATE.READ_ALL__BEGIN_SKIPPING, s)
+
+        text, count, took_all = read_some(subloc, take)
+        if took_all:
+            take -= count
+            s += text
+            subloc += 1
+        else:
+            take = 0
+            s += text
+
+    return (READ_STATE.READ_SOME, s)
+
+def add_banner_to_grid(state, banner):
+    _ignore = banner
+    ad_start_frame = 2
+    ad_index = 3
+    message = AD_TEXTS[ad_index]
+    frames_passed = state["frame"] - ad_start_frame
+    padding_to_remove = max(frames_passed, 0)
+    characters_to_show = int(padding_to_remove / 2.0)
+
+    result, ad_text = read_n_ad_chars(message, 0, characters_to_show)
+
+    padding = " " * (STARTING_AD_SPACING - padding_to_remove)
+    text = f"{padding}{PLANE} {ad_text}"
+
+    GRID.insert(0, f"{COOL}{text}")
 
 def add_directive_to_grid(directive):
     spaces, letters = directive
@@ -387,7 +459,7 @@ def create_and_write_grid(state, directive, banner, collisions):
     if directive: 
         add_directive_to_grid(directive)
     if banner:
-        add_banner_to_grid(banner)
+        add_banner_to_grid(state, banner)
     write_grid(state)
 
 def tick_command(args):

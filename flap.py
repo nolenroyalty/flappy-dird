@@ -224,24 +224,30 @@ class READ_STATE:
     READ_ALL__BEGIN_SKIPPING = 2
     SKIPPED_ALL = 3
 
+# We do all of this weirdness just because I couldn't think of an easy way to handle
+# indexing into a unicode string and i wrote this code without internet. I'm sure
+# there's a "correct" way to handle all of this.
+#
+# It might be nice to instead just generate a huge random string at init time and
+# then index into it. Oh well.
 def read_n_ad_chars(ad, skip, take):
     ad = list(ad)
     # returns: text, count, took all
-    def read_some(subloc, number):
+    def read_n(subloc, n):
         text = ad[subloc]
         if text.startswith("UU"):
             return (text[2:], 2, True)
         else:
-            count = min(number, len(text))
-            took_all = len(text) <= number
-            return (text[:number], count, took_all)
+            count = min(n, len(text))
+            took_all = len(text) <= n
+            return (text[:n], count, took_all)
 
     subloc = 0
     while skip > 0:
         if subloc >= len(ad):
             # god damn the lack of variants in this cursed language
             return (READ_STATE.SKIPPED_ALL, "")
-        _, count, took_all = read_some(subloc, skip)
+        _, count, took_all = read_n(subloc, skip)
         if took_all:
             skip -= count
             subloc += 1
@@ -250,12 +256,12 @@ def read_n_ad_chars(ad, skip, take):
             ad[subloc] = ad[subloc][count:]
 
     s = ""
-    subloc = 0
+    #subloc = 0
     while take > 0:
         if subloc >= len(ad):
             return (READ_STATE.READ_ALL__BEGIN_SKIPPING, s)
 
-        text, count, took_all = read_some(subloc, take)
+        text, count, took_all = read_n(subloc, take)
         if took_all:
             take -= count
             s += text
@@ -272,6 +278,7 @@ def add_banner_to_grid(state, banner):
     ad_index = 3
     message = AD_TEXTS[ad_index]
     frames_passed = state["frame"] - ad_start_frame
+    frames_passed *= 2
     padding_to_remove = max(frames_passed, 0)
     characters_to_show = int(padding_to_remove / 2.0)
 

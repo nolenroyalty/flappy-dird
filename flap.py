@@ -57,14 +57,16 @@ POINT_LEFT  = "👈"
 GEM = "💎"
 TROPHY = "🏆"
 GRID = []
-_AD_TEXTS = [ ("you are the 1,000,000th visitor to this finder window", ), 
-      ("hot", "UU🌶️", "local singles", "UU🦹", "in your area are waiting to chat"),
-      ("made by eieio | check out eieio.games for more"),
-      ("UU🦧", "bonzo buddy toolbar free download", "UU🦍"),
+_AD_TEXTS = [ (" you are the 1,000,000th visitor to this finder window", ), 
+      (" hot", "UU🌶️", "local singles", "UU🦹", "in your area are waiting to chat"),
+      (" made by eieio | check out eieio.games for more"),
+      (" bonsai buddy", "UU🦧", "toolbar free download", "UU🦍"),
      ]
 AD_TEXTS = []
 for ad in _AD_TEXTS:
-    AD_TEXTS.append([text if text.startswith("UU") else letterify(text) for text in ad])
+    ad = [text if text.startswith("UU") else letterify(text) for text in ad]
+    ad.insert(0, "UU✈️")
+    AD_TEXTS.append(ad)
 AD_STARTING_PADDING_SPACES = 70
 
 PipePair = namedtuple("PipePair", ["x", "midpoint", "space_between_top_and_bottom"])
@@ -221,7 +223,7 @@ def add_score_to_grid(state):
 
 class READ_STATE:
     READ_SOME = 1
-    READ_ALL__BEGIN_SKIPPING = 2
+    READ_ALL = 2
     SKIPPED_ALL = 3
 
 # We do all of this weirdness just because I couldn't think of an easy way to handle
@@ -264,7 +266,7 @@ def read_n_ad_chars(ad, skip, take):
     if skipped_all: return (READ_STATE.SKIPPED_ALL, "")
 
     took_all, text = take_n(subloc, take, "")
-    if took_all: return (READ_STATE.READ_ALL__BEGIN_SKIPPING, text)
+    if took_all: return (READ_STATE.READ_ALL, text)
     else: return (READ_STATE.READ_SOME, text)
 
     #subloc = 0
@@ -284,7 +286,7 @@ def read_n_ad_chars(ad, skip, take):
     ##subloc = 0
     #while take > 0:
         #if subloc >= len(ad):
-            #return (READ_STATE.READ_ALL__BEGIN_SKIPPING, s)
+            #return (READ_STATE.READ_ALL, s)
 
         #text, count, took_all = read_n(subloc, take)
         #if took_all:
@@ -298,21 +300,37 @@ def read_n_ad_chars(ad, skip, take):
     #return (READ_STATE.READ_SOME, s)
 
 def add_banner_to_grid(state):
-    ad_start_frame = 2
-    ad_index = 3
+    if "ad_start_frame" not in state:
+        state["ad_start_frame"] = state["frame"]
+
+    if "ad_index" not in state:
+        state["ad_index"] = 1
+
+    ad_index = state["ad_index"]
+    ad_start_frame = state["ad_start_frame"]
     message = AD_TEXTS[ad_index]
-    frames_passed = state["frame"] - ad_start_frame
-    frames_passed *= 2
-    padding_to_remove = max(frames_passed, 0)
+    horizontal_movement = 2 * (state["frame"] - ad_start_frame)
+    padding_to_remove = max(horizontal_movement, 0)
     characters_to_show = int(padding_to_remove / 2.0)
 
-    result, ad_text = read_n_ad_chars(message, 0, characters_to_show)
+    arbitrary_amount = 29
+    skip = max(0, characters_to_show - arbitrary_amount)
+    result, ad_text = read_n_ad_chars(message, skip, characters_to_show)
 
-    padding = " " * (STARTING_AD_SPACING - padding_to_remove)
-    text = f"{padding}{PLANE} {ad_text}"
-
-    GRID.insert(0, f"{COOL}{text}")
-
+    match result:
+        case READ_STATE.READ_SOME | READ_STATE.READ_ALL:
+            # If we wanted more than one ad on the screen at the same time we could
+            # add a buch of right padding and add a second one on the right side of the
+            # screen when READ_ALL fires. But I don't think that's super important
+            # to do so we don't.
+            padding = " " * (STARTING_AD_SPACING - padding_to_remove)
+            text = f"{padding}{ad_text}"
+            GRID.insert(0, f"{COOL}{text}")
+        case READ_STATE.SKIPPED_ALL:
+            state["ad_index"] = 2
+            # clear state, call self again
+            pass
+    
 def add_directive_to_grid(directive):
     spaces, letters = directive
     letters = letterify(letters)
@@ -328,12 +346,17 @@ def file_sort_key(filename):
         return -1
     return int(filename.split(" ")[-1])
 
+# I've gotta say, "sort by the number at the end of each line" worked really
+# well in the prototype but with this much stuff in the grid some *weird* shit
+# happens if you play with [file_sort_key] above. The code works, I am not
+# debugging further, this is literally flappy bird in finder after all.
 def write_grid(state):
     target_dir = buffer_to_write_to(state)
     files = sorted(
             (file for file in os.listdir(target_dir) if not file.startswith(".")),
             key=file_sort_key)
 
+    # weirdness mentioned above likely because of idx here
     for idx, (file, gridline) in enumerate(zip(files, GRID)):
         file = os.path.join(target_dir, file)
         gridline = "".join(gridline)

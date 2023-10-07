@@ -60,8 +60,8 @@ GEM = "💎"
 TROPHY = "🏆"
 GRID = []
 _AD_TEXTS = [ (" you are the 1,000,000th visitor to this finder window", ), 
-      (" hot", "UU🌶️", "local singles", "UU😘", "in your area ", "UU📍", " are waiting to chat ", "UU❤️"),
       (" made by eieio | check out eieio.games for more"),
+      (" hot", "UU🌶️", "local singles", "UU😘", "in your area ", "UU📍", " are waiting to chat ", "UU❤️"),
       (" bonsai buddy", "UU🦧", "toolbar free download", "UU🦍"),
      ]
 AD_TEXTS = []

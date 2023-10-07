@@ -242,38 +242,62 @@ def read_n_ad_chars(ad, skip, take):
             took_all = len(text) <= n
             return (text[:n], count, took_all)
 
-    subloc = 0
-    while skip > 0:
-        if subloc >= len(ad):
-            # god damn the lack of variants in this cursed language
-            return (READ_STATE.SKIPPED_ALL, "")
-        _, count, took_all = read_n(subloc, skip)
-        if took_all:
-            skip -= count
-            subloc += 1
-        else:
-            skip = 0
-            ad[subloc] = ad[subloc][count:]
+    def skip_n(subloc, n):
+        if n <= 0: return False, subloc
+        if subloc >= len(ad): return True, subloc
 
-    s = ""
+        _, count, took_all = read_n(subloc, n)
+        if took_all: return skip_n(subloc + 1, n - count)
+        else:
+            ad[subloc] = ad[subloc][n:]
+            return False, subloc
+
+    def take_n(subloc, n, acc):
+        if n <= 0: return False, acc
+        if subloc >= len(ad): return True, acc
+
+        text, count, took_all = read_n(subloc, n)
+        if took_all: return take_n(subloc + 1, n - count, acc + text)
+        else: return False, acc + text
+
+    skipped_all, subloc = skip_n(0, skip)
+    if skipped_all: return (READ_STATE.SKIPPED_ALL, "")
+
+    took_all, text = take_n(subloc, take, "")
+    if took_all: return (READ_STATE.READ_ALL__BEGIN_SKIPPING, text)
+    else: return (READ_STATE.READ_SOME, text)
+
     #subloc = 0
-    while take > 0:
-        if subloc >= len(ad):
-            return (READ_STATE.READ_ALL__BEGIN_SKIPPING, s)
+    #while skip > 0:
+        #if subloc >= len(ad):
+            ## god damn the lack of variants in this cursed language
+            #return (READ_STATE.SKIPPED_ALL, "")
+        #_, count, took_all = read_n(subloc, skip)
+        #if took_all:
+            #skip -= count
+            #subloc += 1
+        #else:
+            #skip = 0
+            #ad[subloc] = ad[subloc][count:]
 
-        text, count, took_all = read_n(subloc, take)
-        if took_all:
-            take -= count
-            s += text
-            subloc += 1
-        else:
-            take = 0
-            s += text
+    #s = ""
+    ##subloc = 0
+    #while take > 0:
+        #if subloc >= len(ad):
+            #return (READ_STATE.READ_ALL__BEGIN_SKIPPING, s)
 
-    return (READ_STATE.READ_SOME, s)
+        #text, count, took_all = read_n(subloc, take)
+        #if took_all:
+            #take -= count
+            #s += text
+            #subloc += 1
+        #else:
+            #take = 0
+            #s += text
 
-def add_banner_to_grid(state, banner):
-    _ignore = banner
+    #return (READ_STATE.READ_SOME, s)
+
+def add_banner_to_grid(state):
     ad_start_frame = 2
     ad_index = 3
     message = AD_TEXTS[ad_index]
@@ -458,15 +482,14 @@ def handle_tick_dying(state):
     state["player_y"] = player_y
     return directive
 
-def create_and_write_grid(state, directive, banner, collisions):
+def create_and_write_grid(state, directive, collisions):
     initialize_grid()
     add_pipes_to_grid(state)
     add_player_to_grid(state, collisions)
     add_score_to_grid(state)
     if directive: 
         add_directive_to_grid(directive)
-    if banner:
-        add_banner_to_grid(state, banner)
+    add_banner_to_grid(state)
     write_grid(state)
 
 def tick_command(args):
@@ -484,7 +507,7 @@ def tick_command(args):
             directive = handle_tick_dying(state)
             collisions = set()
 
-    create_and_write_grid(state, directive, COOL, collisions)
+    create_and_write_grid(state, directive, collisions)
     write_state(state)
 
 def initialize_command(args):
@@ -492,7 +515,7 @@ def initialize_command(args):
     initialize_buffers()
     if os.path.exists("log"):
         os.remove("log")
-    create_and_write_grid(state, (8, "double click to start"), COOL, set())
+    create_and_write_grid(state, (8, "double click to start"), set())
     write_state(state)
 
 def first_time_setup_command(args):

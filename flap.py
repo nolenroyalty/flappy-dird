@@ -470,7 +470,8 @@ def handle_tick_running(state, count):
     else:
         maybe_increment_score(state)
 
-    return collisions
+    directive = (17, "click to flap")
+    return collisions, directive
 
 def handle_tick_dying(state):
     directive = 20, "game over"
@@ -480,15 +481,14 @@ def handle_tick_dying(state):
         directive = 6, "double click to restart"
     player_y = min(player_y + 2, HEIGHT - 1 - GROUND_HEIGHT)
     state["player_y"] = player_y
-    return directive
+    return set(), directive
 
 def create_and_write_grid(state, directive, collisions):
     initialize_grid()
     add_pipes_to_grid(state)
     add_player_to_grid(state, collisions)
     add_score_to_grid(state)
-    if directive: 
-        add_directive_to_grid(directive)
+    add_directive_to_grid(directive)
     add_banner_to_grid(state)
     write_grid(state)
 
@@ -498,14 +498,11 @@ def tick_command(args):
     match state["state"]:
         case "waiting":
             state["state"] = "ticking"
-            collisions = handle_tick_running(state, args.selection_count)
-            directive = 17, "click to flap"
+            collisions, directive = handle_tick_running(state, args.selection_count)
         case "ticking":
-            collisions = handle_tick_running(state, args.selection_count)
-            directive = 17, "click to flap"
+            collisions, directive = handle_tick_running(state, args.selection_count)
         case "dying" | "dead":
-            directive = handle_tick_dying(state)
-            collisions = set()
+            collisions, directive = handle_tick_dying(state)
 
     create_and_write_grid(state, directive, collisions)
     write_state(state)

@@ -118,7 +118,7 @@ def get_initial_state():
              "state": "waiting",
              "pipes": first_two_pairs,
              "score": 0,
-             "ad_index" : 1,
+             "ad_index" : 0,
              "ad_start_frame" : 0
              }
 

@@ -20,7 +20,8 @@ PIPE_WIDTH = 3
 PLAYER_X = 3
 TARGET_FPS = 4
 TARGET_FRAMETIME = 1.0 / TARGET_FPS
-MAX_FRAME = 100
+# Do we still need this?
+MAX_FRAME = 2048
 SCORE_LINE = -2
 
 BUFFER_1 = "./buf1"
@@ -40,7 +41,8 @@ ORANGE = "🟧"
 X      = "❌"
 RED    = "🟥"
 EYES   = "👀"
-COOL   = "🆒"
+#COOL   = "🆒"
+BANNER_X   = "❎"
 PLANE  = "✈️"
 STARTING_AD_SPACING = len("                                                                  ")
 # You might be inclined to put these in a string and index into that string but
@@ -58,7 +60,7 @@ GEM = "💎"
 TROPHY = "🏆"
 GRID = []
 _AD_TEXTS = [ (" you are the 1,000,000th visitor to this finder window", ), 
-      (" hot", "UU🌶️", "local singles", "UU🦹", "in your area are waiting to chat"),
+      (" hot", "UU🌶️", "local singles", "UU😘", "in your area ", "UU📍", " are waiting to chat ", "UU❤️"),
       (" made by eieio | check out eieio.games for more"),
       (" bonsai buddy", "UU🦧", "toolbar free download", "UU🦍"),
      ]
@@ -115,7 +117,9 @@ def get_initial_state():
              "flapped_on_prior_frame": False,
              "state": "waiting",
              "pipes": first_two_pairs,
-             "score": 8,
+             "score": 0,
+             "ad_index" : 1,
+             "ad_start_frame" : 0
              }
 
     for k, v in initial.items(): 
@@ -147,7 +151,7 @@ def initialize_buffers():
             if file.startswith("."): continue
             os.remove(f"{cwd}/{dir_}/{file}")
 
-        os.symlink(f"{cwd}/{dir_}", f"{dir_}/{COOL}")
+        os.symlink(f"{cwd}/{dir_}", f"{dir_}/{BANNER_X}")
 
         for i in range(HEIGHT):
             os.symlink(f"{cwd}/{dir_}", f"{dir_}/{i}")
@@ -221,6 +225,7 @@ def add_score_to_grid(state):
     add_aux(SCORE_LINE+1, state["high_score"], TROPHY)
 
 
+# good lord imagine if python actually had variants
 class READ_STATE:
     READ_SOME = 1
     READ_ALL = 2
@@ -269,53 +274,18 @@ def read_n_ad_chars(ad, skip, take):
     if took_all: return (READ_STATE.READ_ALL, text)
     else: return (READ_STATE.READ_SOME, text)
 
-    #subloc = 0
-    #while skip > 0:
-        #if subloc >= len(ad):
-            ## god damn the lack of variants in this cursed language
-            #return (READ_STATE.SKIPPED_ALL, "")
-        #_, count, took_all = read_n(subloc, skip)
-        #if took_all:
-            #skip -= count
-            #subloc += 1
-        #else:
-            #skip = 0
-            #ad[subloc] = ad[subloc][count:]
-
-    #s = ""
-    ##subloc = 0
-    #while take > 0:
-        #if subloc >= len(ad):
-            #return (READ_STATE.READ_ALL, s)
-
-        #text, count, took_all = read_n(subloc, take)
-        #if took_all:
-            #take -= count
-            #s += text
-            #subloc += 1
-        #else:
-            #take = 0
-            #s += text
-
-    #return (READ_STATE.READ_SOME, s)
-
 def add_banner_to_grid(state):
-    if "ad_start_frame" not in state:
-        state["ad_start_frame"] = state["frame"]
-
-    if "ad_index" not in state:
-        state["ad_index"] = 1
-
     ad_index = state["ad_index"]
     ad_start_frame = state["ad_start_frame"]
     message = AD_TEXTS[ad_index]
     horizontal_movement = 2 * (state["frame"] - ad_start_frame)
     padding_to_remove = max(horizontal_movement, 0)
-    characters_to_show = int(padding_to_remove / 2.0)
 
-    arbitrary_amount = 29
-    skip = max(0, characters_to_show - arbitrary_amount)
-    result, ad_text = read_n_ad_chars(message, skip, characters_to_show)
+    arbitrary_guess_at_text_width = 32
+    characters_to_show = int(padding_to_remove / 2.0)
+    skip = max(0, characters_to_show - arbitrary_guess_at_text_width)
+    take = min(characters_to_show, arbitrary_guess_at_text_width)
+    result, ad_text = read_n_ad_chars(message, skip, take)
 
     match result:
         case READ_STATE.READ_SOME | READ_STATE.READ_ALL:
@@ -325,11 +295,11 @@ def add_banner_to_grid(state):
             # to do so we don't.
             padding = " " * (STARTING_AD_SPACING - padding_to_remove)
             text = f"{padding}{ad_text}"
-            GRID.insert(0, f"{COOL}{text}")
+            GRID.insert(0, f"{BANNER_X}{text}")
         case READ_STATE.SKIPPED_ALL:
-            state["ad_index"] = 2
-            # clear state, call self again
-            pass
+            state["ad_index"] = (state["ad_index"] + 1) % len(AD_TEXTS)
+            state["ad_start_frame"] = state["frame"] 
+            add_banner_to_grid(state)
     
 def add_directive_to_grid(directive):
     spaces, letters = directive
@@ -342,7 +312,7 @@ def file_sort_key(filename):
     # Directive, goes at the bottom
     if POINT_RIGHT in filename: return HEIGHT*2
     # Banner, goes at the top
-    if COOL in filename: 
+    if BANNER_X in filename: 
         return -1
     return int(filename.split(" ")[-1])
 
@@ -363,7 +333,7 @@ def write_grid(state):
         suffix = idx
         if POINT_RIGHT in gridline:
             suffix = f" {POINT_LEFT}"
-        if COOL in gridline:
+        if BANNER_X in gridline:
             suffix = ""
         gridline = os.path.join(target_dir, f"{gridline} {suffix}")
 

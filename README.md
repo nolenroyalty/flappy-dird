@@ -12,4 +12,6 @@ I will very happily take pull requests if they add new functionality, fix bugs, 
 
 Gameplay:
 
-https://github.com/nolenroyalty/flappy-dird/assets/1676311/47b75ff6-e28a-451b-afb9-1687bd019daa
+https://github.com/nolenroyalty/flappy-dird/assets/1676311/4ba1ecae-0491-4efd-bb06-c6e000b90bf8
+
+

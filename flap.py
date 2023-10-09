@@ -287,19 +287,19 @@ def add_banner_to_grid(state):
     take = min(characters_to_show, arbitrary_guess_at_text_width)
     result, ad_text = read_n_ad_chars(message, skip, take)
 
-    match result:
-        case READ_STATE.READ_SOME | READ_STATE.READ_ALL:
-            # If we wanted more than one ad on the screen at the same time we could
-            # add a buch of right padding and add a second one on the right side of the
-            # screen when READ_ALL fires. But I don't think that's super important
-            # to do so we don't.
-            padding = " " * (STARTING_AD_SPACING - padding_to_remove)
-            text = f"{padding}{ad_text}"
-            GRID.insert(0, f"{BANNER_X}{text}")
-        case READ_STATE.SKIPPED_ALL:
-            state["ad_index"] = (state["ad_index"] + 1) % len(AD_TEXTS)
-            state["ad_start_frame"] = state["frame"] 
-            add_banner_to_grid(state)
+    # I'd rather this be a match but we use ifs to make this run on more versions of Python
+    if result in {READ_STATE.READ_SOME, READ_STATE.READ_ALL}:
+        # If we wanted more than one ad on the screen at the same time we could
+        # add a buch of right padding and add a second one on the right side of the
+        # screen when READ_ALL fires. But I don't think that's super important
+        # to do so we don't.
+        padding = " " * (STARTING_AD_SPACING - padding_to_remove)
+        text = f"{padding}{ad_text}"
+        GRID.insert(0, f"{BANNER_X}{text}")
+    elif result == READ_STATE.SKIPPED_ALL:
+        state["ad_index"] = (state["ad_index"] + 1) % len(AD_TEXTS)
+        state["ad_start_frame"] = state["frame"] 
+        add_banner_to_grid(state)
     
 def add_directive_to_grid(directive):
     spaces, letters = directive
@@ -488,14 +488,13 @@ def create_and_write_grid(state, directive, collisions):
 def tick_command(args):
     state = read_state()
 
-    match state["state"]:
-        case "waiting":
-            state["state"] = "ticking"
-            collisions, directive = handle_tick_running(state, args.selection_count)
-        case "ticking":
-            collisions, directive = handle_tick_running(state, args.selection_count)
-        case "dying" | "dead":
-            collisions, directive = handle_tick_dying(state)
+    if state["state"] == "waiting":
+        state["state"] = "ticking"
+        collisions, directive = handle_tick_running(state, args.selection_count)
+    elif state["state"] == "ticking":
+        collisions, directive = handle_tick_running(state, args.selection_count)
+    elif state["state"] in { "dying", "dead" }:
+        collisions, directive = handle_tick_dying(state)
 
     create_and_write_grid(state, directive, collisions)
     write_state(state)
@@ -516,6 +515,9 @@ def first_time_setup_command(args):
         os.remove(target)
     shutil.copy(template, target)
     subprocess.check_output(["sed", "-i", "", f"s#@CWD#{my_dir}#g", target])
+
+    for dir_ in (BUFFER_1, BUFFER_2):
+        if not os.path.exists(dir_): os.mkdir(dir_)
 
 def main():
     parser = argparse.ArgumentParser(description="Run flappy dird")

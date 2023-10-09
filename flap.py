@@ -367,7 +367,7 @@ def check_for_collision(state):
 
 def get_last_opened(state):
     buffer = displayed_buffer(state)
-    command = f"mdls -attr kMDItemLastUsedDate {buffer}"
+    command = f"mdls -name kMDItemLastUsedDate {buffer}"
     return subprocess.check_output(command.split()).strip().decode("utf-8")
 
 def await_command(args):

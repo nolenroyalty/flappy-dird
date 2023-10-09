@@ -12,6 +12,7 @@ import argparse
 import random
 from collections import namedtuple
 import string
+import platform
 
 WIDTH = 15
 HEIGHT = 20
@@ -70,6 +71,16 @@ for ad in _AD_TEXTS:
     ad.insert(0, "UU✈️")
     AD_TEXTS.append(ad)
 AD_STARTING_PADDING_SPACES = 70
+
+if int(''.join(map(lambda s: '%02d' % int(s), platform.mac_ver()[0].split('.')))) < 101501:
+    # bummer, we have to use some old emoji that only kinda sorta look like what we wanted
+    BLUE   = "🆒"
+    GREEN  = "✅"
+    WHITE  = "⬜"
+    BROWN =  "🏾" # HACK: this is supposed to be a skin tone modifier
+    YELLOW = "📒"
+    ORANGE = "📙"
+    RED    = X
 
 PipePair = namedtuple("PipePair", ["x", "midpoint", "space_between_top_and_bottom"])
 def generate_random_pipe(x):

@@ -5,7 +5,7 @@ To play:
 * Clone the repo
 * Run `flap.py first-time-setup` (`flap.py` has no dependencies)
 * Open a Finder window
-* Run `osascript ./flapy-dird.applescript`
+* Run `osascript ./flappy-dird.applescript`
 * Find the Finder window you opened, play the game.
 
 I will very happily take pull requests if they add new functionality, fix bugs, or are funny.

@@ -72,7 +72,14 @@ for ad in _AD_TEXTS:
     AD_TEXTS.append(ad)
 AD_STARTING_PADDING_SPACES = 70
 
-if int(''.join(map(lambda s: '%02d' % int(s), platform.mac_ver()[0].split('.')))) < 101501:
+def mac_version_number():
+    num = platform.mac_ver()[0]
+    if num.count(".") < 2: num = num + ".0"
+    num = "".join("%02d" % int(s) for s in num.split("."))
+    return int(num)
+
+# Some unicode is not supported on older macs :/
+if mac_version_number() < 101501:
     # bummer, we have to use some old emoji that only kinda sorta look like what we wanted
     BLUE   = "🆒"
     GREEN  = "✅"

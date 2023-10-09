@@ -5,7 +5,8 @@ To play:
 * Clone the repo
 * Run `flap.py first-time-setup` (`flap.py` has no dependencies)
 * Open Finder and navigate to the directory where you put this code
-* Open the directory `buf1` and sort the window by "Date Modified." Do the same thing with `buf2`.
+* Set the display mode to list view
+* Open the directory `buf1` and sort the window by "Date Modified", ascending (arrow pointing up). Do the same thing with `buf2`.
     * The game will look really weird if you don't do this!!
 * Run `osascript ./flappy-dird.applescript`
 * Find the Finder window you opened, play the game.

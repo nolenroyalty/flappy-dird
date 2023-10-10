@@ -3,6 +3,7 @@ An implementation of flappy bird in MacOS's Finder.
 
 To play:
 * Clone the repo
+* Run `flap.py first-time-setup` (`flap.py` has no dependencies)
 * Open Finder and navigate to the directory where you put this code
 * Set the display mode to list view
 * Open the directory `buf1` and sort the window by "Date Modified", ascending (arrow pointing up). Do the same thing with `buf2`.

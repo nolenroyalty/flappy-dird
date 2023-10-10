@@ -520,14 +520,6 @@ def initialize_command(args):
     write_state(state)
 
 def first_time_setup_command(args):
-    my_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
-    template = f"{my_dir}/template.applescript" 
-    target   = f"{my_dir}/flappy-dird.applescript"
-    if os.path.exists(target):
-        os.remove(target)
-    shutil.copy(template, target)
-    subprocess.check_output(["sed", "-i", "", f"s#@CWD#{my_dir}#g", target])
-
     for dir_ in (BUFFER_1, BUFFER_2):
         if not os.path.exists(dir_): os.mkdir(dir_)
 

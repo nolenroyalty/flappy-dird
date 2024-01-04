@@ -1,4 +1,4 @@
-Check out [the blog post](https://eieio.games/nonsense/game-11-flappy-bird-finder/) for lots of details on how this works!
+## Check out [the blog post](https://eieio.games/nonsense/game-11-flappy-bird-finder/) for lots of details on how this works!
 
 # flappy-dird
 An implementation of flappy bird in MacOS's Finder.

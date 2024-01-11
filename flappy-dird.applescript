@@ -17,24 +17,25 @@ on setFinderTarget(buf)
 end setFinderTarget
 
 -- Main program starts here
-set curBuf to do shell script projectPath & "flap.py init"
+set quotedProjectPath to "\"" & projectPath & "\""
+set curBuf to do shell script quotedProjectPath & "flap.py init"
 setFinderTarget("buf2") -- Avoid caching old filenames
 setFinderTarget(curBuf)
 
-do shell script projectPath & "flap.py await"
+do shell script quotedProjectPath & "flap.py await"
 
 repeat while true -- equivalent to '1 = 1'
     set shouldContinue to "continue"
     repeat while shouldContinue = "continue"
         tell application "Finder" to set selectedItems to selection
-        set curBuf to do shell script projectPath & "flap.py tick " & (number of selectedItems)
+        set curBuf to do shell script quotedProjectPath & "flap.py tick " & (number of selectedItems)
         setFinderTarget(curBuf)
-        set shouldContinue to do shell script projectPath & "flap.py sleep"
+        set shouldContinue to do shell script quotedProjectPath & "flap.py sleep"
     end repeat
 
-    do shell script projectPath & "flap.py await"
+    do shell script quotedProjectPath & "flap.py await"
 
-    set curBuf to do shell script projectPath & "flap.py init"
+    set curBuf to do shell script quotedProjectPath & "flap.py init"
     setFinderTarget("buf2") -- Avoid caching old filenames
     setFinderTarget(curBuf)
 end repeat

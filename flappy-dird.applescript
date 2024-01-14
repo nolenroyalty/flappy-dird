@@ -17,7 +17,7 @@ on setFinderTarget(buf)
 end setFinderTarget
 
 -- Main program starts here
-set quotedProjectPath to "\"" & projectPath & "\""
+set quotedProjectPath to quoted form of projectPath
 set curBuf to do shell script quotedProjectPath & "flap.py init"
 setFinderTarget("buf2") -- Avoid caching old filenames
 setFinderTarget(curBuf)
